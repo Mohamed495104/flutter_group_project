@@ -9,6 +9,7 @@ import '../providers/cart_provider.dart';
 import '../providers/wishlist.dart';
 import '../services/firebase_options.dart';
 import '../widgets/product_card.dart';
+import '../utils/constants.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -37,9 +38,12 @@ class _HomeScreenState extends State<HomeScreen> {
   String searchQuery = '';
   bool _isLoading = true;
   String? _error;
-
-  static const String _dbUrl =
-      'https://flutter-group-project-3541f-default-rtdb.firebaseio.com';
+  
+  // Pagination variables
+  static const int _productsPerPage = 20;
+  int _currentPage = 0;
+  bool _hasMoreProducts = true;
+  bool _isLoadingMore = false;
 
   @override
   void initState() {
@@ -62,7 +66,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
       _database = FirebaseDatabase.instanceFor(
         app: Firebase.app(),
-        databaseURL: _dbUrl,
+        databaseURL: firebaseDatabaseUrl,
       ).ref();
 
       await _loadProducts();
@@ -75,15 +79,25 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _loadProducts() async {
+  Future<void> _loadProducts({bool loadMore = false}) async {
     if (_database == null) return;
+    if (loadMore && !_hasMoreProducts) return;
+    if (loadMore && _isLoadingMore) return;
+
+    if (loadMore) {
+      setState(() => _isLoadingMore = true);
+    }
 
     final snapshot = await _database!.child('products').once();
     final raw = snapshot.snapshot.value;
     final List<Product> loaded = [];
 
     if (raw == null) {
-      _allProducts = [];
+      setState(() {
+        _allProducts = [];
+        _hasMoreProducts = false;
+        _isLoadingMore = false;
+      });
       return;
     }
 
@@ -104,7 +118,16 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (mounted) {
       setState(() {
-        _allProducts = loaded;
+        if (loadMore) {
+          // For simplicity, we're loading all products at once
+          // In a real implementation, you'd use Firebase query limits
+          _allProducts = loaded;
+          _hasMoreProducts = false; // All loaded
+        } else {
+          _allProducts = loaded;
+          _hasMoreProducts = loaded.length > _productsPerPage;
+        }
+        _isLoadingMore = false;
       });
     }
   }

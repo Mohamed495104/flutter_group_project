@@ -5,6 +5,7 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/foundation.dart';
 
 import '../models/product.dart';
+import '../utils/constants.dart';
 
 class CartProvider with ChangeNotifier {
   final List<Map<String, dynamic>> _cartItems = [];
@@ -13,6 +14,9 @@ class CartProvider with ChangeNotifier {
 
   String? _userId;
   bool _squelchRemote = false; // prevents remote re-hydration during local ops
+  
+  // Error callback for UI to display error messages
+  Function(String)? onError;
 
   CartProvider() {
     _initialize();
@@ -99,6 +103,14 @@ class CartProvider with ChangeNotifier {
       notifyListeners();
     } catch (e) {
       debugPrint('Error adding to cart: $e');
+      onError?.call('Failed to add ${product.name} to cart. Please try again.');
+      
+      // Revert optimistic update
+      final idx = _cartItems.indexWhere((it) => (it['product'] as Product).id == product.id);
+      if (idx != -1) {
+        _cartItems.removeAt(idx);
+        notifyListeners();
+      }
     } finally {
       _squelchRemote = false;
     }
@@ -134,6 +146,7 @@ class CartProvider with ChangeNotifier {
       notifyListeners();
     } catch (e) {
       debugPrint('Error removing from cart: $e');
+      onError?.call('Failed to remove ${product.name} from cart. Please try again.');
     } finally {
       _squelchRemote = false;
     }
@@ -161,6 +174,7 @@ class CartProvider with ChangeNotifier {
       }
     } catch (e) {
       debugPrint('Error updating quantity: $e');
+      onError?.call('Failed to update quantity for ${product.name}. Please try again.');
     } finally {
       _squelchRemote = false;
     }
@@ -178,6 +192,7 @@ class CartProvider with ChangeNotifier {
       notifyListeners();
     } catch (e) {
       debugPrint('Error clearing cart: $e');
+      onError?.call('Failed to clear cart. Please try again.');
     } finally {
       _squelchRemote = false;
     }
@@ -192,8 +207,7 @@ class CartProvider with ChangeNotifier {
           .instance.app; // requires Firebase.initializeApp done once
       _rootRef = FirebaseDatabase.instanceFor(
         app: app,
-        databaseURL:
-            'https://flutter-group-project-3541f-default-rtdb.firebaseio.com',
+        databaseURL: firebaseDatabaseUrl,
       ).ref();
 
       // pick current user id; keep it flexible if not logged in yet

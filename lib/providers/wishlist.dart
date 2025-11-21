@@ -1,10 +1,9 @@
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 
 import '../models/product.dart';
-import '../services/firebase_options.dart';
+import '../utils/constants.dart';
 
 class WishlistProvider extends ChangeNotifier {
   final List<Product> _wishlist = [];
@@ -23,14 +22,10 @@ class WishlistProvider extends ChangeNotifier {
 
   Future<void> _initializeFirebase() async {
     try {
-      await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.currentPlatform,
-      );
-
+      // Use existing Firebase instance (initialized in main.dart)
       _database = FirebaseDatabase.instanceFor(
         app: Firebase.app(),
-        databaseURL:
-            'https://flutter-group-project-3541f-default-rtdb.firebaseio.com',
+        databaseURL: firebaseDatabaseUrl,
       ).ref();
 
       _auth.authStateChanges().listen((User? user) {
