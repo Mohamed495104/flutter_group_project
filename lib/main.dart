@@ -23,8 +23,7 @@ void main() async {
 
   FirebaseDatabase.instanceFor(
     app: Firebase.app(),
-    databaseURL:
-        'https://flutter-group-project-3541f-default-rtdb.firebaseio.com',
+    databaseURL: firebaseDatabaseUrl,
   );
 
   runApp(

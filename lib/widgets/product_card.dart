@@ -5,11 +5,18 @@ import '../models/product.dart';
 import '../providers/cart_provider.dart';
 import '../providers/wishlist.dart';
 
-class ProductCard extends StatelessWidget {
+class ProductCard extends StatefulWidget {
   final Product product;
   final VoidCallback onTap;
 
   const ProductCard({super.key, required this.product, required this.onTap});
+
+  @override
+  State<ProductCard> createState() => _ProductCardState();
+}
+
+class _ProductCardState extends State<ProductCard> {
+  bool _isLoading = false;
 
   @override
   Widget build(BuildContext context) {
@@ -17,7 +24,7 @@ class ProductCard extends StatelessWidget {
         Provider.of<WishlistProvider>(context, listen: true);
 
     return GestureDetector(
-      onTap: onTap,
+      onTap: widget.onTap,
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white,
@@ -50,8 +57,8 @@ class ProductCard extends StatelessWidget {
                     right: 8,
                     child: GestureDetector(
                       onTap: () {
-                        if (wishlistProvider.isInWishlist(product)) {
-                          wishlistProvider.removeFromWishlist(product);
+                        if (wishlistProvider.isInWishlist(widget.product)) {
+                          wishlistProvider.removeFromWishlist(widget.product);
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                               content: Text('Removed from wishlist'),
@@ -60,7 +67,7 @@ class ProductCard extends StatelessWidget {
                             ),
                           );
                         } else {
-                          wishlistProvider.addToWishlist(product);
+                          wishlistProvider.addToWishlist(widget.product);
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                               content: Text('Added to wishlist'),
@@ -84,10 +91,10 @@ class ProductCard extends StatelessWidget {
                           ],
                         ),
                         child: Icon(
-                          wishlistProvider.isInWishlist(product)
+                          wishlistProvider.isInWishlist(widget.product)
                               ? Icons.favorite
                               : Icons.favorite_border,
-                          color: wishlistProvider.isInWishlist(product)
+                          color: wishlistProvider.isInWishlist(widget.product)
                               ? Colors.red
                               : const Color(0xFF8B4513),
                           size: 20,
@@ -107,7 +114,7 @@ class ProductCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      product.name,
+                      widget.product.name,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
@@ -118,7 +125,7 @@ class ProductCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      "\$${product.price.toStringAsFixed(2)}",
+                      "\$${widget.product.price.toStringAsFixed(2)}",
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
@@ -129,47 +136,81 @@ class ProductCard extends StatelessWidget {
                     // ✅ Toggle Add/Remove from Cart button (live)
                     Consumer<CartProvider>(
                       builder: (context, cartProvider, _) {
+                        // Set error handler
+                        cartProvider.onError = (message) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(message),
+                              backgroundColor: Colors.red,
+                              duration: const Duration(seconds: 3),
+                            ),
+                          );
+                        };
+                        
                         final bool inCart = cartProvider.cartItems.any(
                           (item) =>
-                              (item['product'] as Product).id == product.id,
+                              (item['product'] as Product).id == widget.product.id,
                         );
 
                         return SizedBox(
                           width: double.infinity,
                           height: 36,
                           child: ElevatedButton.icon(
-                            onPressed: () {
-                              if (inCart) {
-                                cartProvider.removeFromCart(product);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                        '${product.name} removed from cart'),
-                                    backgroundColor: const Color(0xFF8B4513),
-                                    duration: const Duration(seconds: 2),
-                                  ),
-                                );
-                              } else {
-                                cartProvider.addToCart(product);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content:
-                                        Text('${product.name} added to cart'),
-                                    backgroundColor: const Color(0xFF8B4513),
-                                    duration: const Duration(seconds: 2),
-                                  ),
-                                );
+                            onPressed: _isLoading ? null : () async {
+                              setState(() => _isLoading = true);
+                              
+                              try {
+                                if (inCart) {
+                                  await cartProvider.removeFromCart(widget.product);
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                            '${widget.product.name} removed from cart'),
+                                        backgroundColor: const Color(0xFF8B4513),
+                                        duration: const Duration(seconds: 2),
+                                      ),
+                                    );
+                                  }
+                                } else {
+                                  await cartProvider.addToCart(widget.product);
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content:
+                                            Text('${widget.product.name} added to cart'),
+                                        backgroundColor: const Color(0xFF8B4513),
+                                        duration: const Duration(seconds: 2),
+                                      ),
+                                    );
+                                  }
+                                }
+                              } finally {
+                                if (mounted) {
+                                  setState(() => _isLoading = false);
+                                }
                               }
                             },
-                            icon: Icon(
-                              inCart
-                                  ? Icons.remove_shopping_cart_outlined
-                                  : Icons.shopping_cart_outlined,
-                              size: 16,
-                              color: Colors.white,
-                            ),
+                            icon: _isLoading 
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                  ),
+                                )
+                              : Icon(
+                                  inCart
+                                      ? Icons.remove_shopping_cart_outlined
+                                      : Icons.shopping_cart_outlined,
+                                  size: 16,
+                                  color: Colors.white,
+                                ),
                             label: Text(
-                              inCart ? 'Remove from Cart' : 'Add to Cart',
+                              _isLoading 
+                                ? 'Processing...'
+                                : (inCart ? 'Remove from Cart' : 'Add to Cart'),
                               style: const TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
@@ -200,7 +241,7 @@ class ProductCard extends StatelessWidget {
   Widget _buildImage() {
     String categoryFolder;
 
-    switch (product.category) {
+    switch (widget.product.category) {
       case 'Paintings':
         categoryFolder = 'paintings';
         break;
@@ -217,17 +258,17 @@ class ProductCard extends StatelessWidget {
         categoryFolder = 'miniature';
         break;
       default:
-        categoryFolder = product.category.toLowerCase();
+        categoryFolder = widget.product.category.toLowerCase();
     }
 
-    final jpgPath = 'assets/images/$categoryFolder/${product.id}.jpg';
+    final jpgPath = 'assets/images/$categoryFolder/${widget.product.id}.jpg';
 
     return Image.asset(
       jpgPath,
       fit: BoxFit.cover,
       width: double.infinity,
       errorBuilder: (context, error, stackTrace) {
-        final pngPath = 'assets/images/$categoryFolder/${product.id}.png';
+        final pngPath = 'assets/images/$categoryFolder/${widget.product.id}.png';
         return Image.asset(
           pngPath,
           fit: BoxFit.cover,
